@@ -37,6 +37,56 @@ const MARIA_PORTRAITS = [
   "/maria-face-painting.png",
   "/maria-face-cap-close.png",
 ];
+const MOTIVATIONAL_MESSAGES = [
+  "Se não conseguir vencer o dia, pelo menos empate. Amanhã tem jogo de volta.",
+  "Não tome decisões definitivas com base em emoções temporárias ou de estômago vazio.",
+  "Um problema de cada vez, porque sofrer por atacado não dá desconto.",
+  "Você não precisa dar conta de tudo. Nem Deus criou o mundo em um único dia.",
+  "Antes de questionar todas as suas escolhas de vida, experimente dormir oito horas.",
+  "Não sofra por antecipação. Respeite a ordem cronológica dos problemas.",
+  "Viva um dia de cada vez. Até porque viver dois simultaneamente seria desvio de função.",
+  "O futuro pertence a Deus. Pare de tentar assumir o departamento administrativo dele.",
+  "Seja paciente com o processo. Nem o décimo terceiro cai todo mês.",
+  "Não precisa ter um plano para tudo. Até o Google Maps recalcula a rota.",
+  "Entregue seus problemas a Deus e pare de pedir o código de rastreamento.",
+  "Não confunda uma crise existencial com necessidade de férias.",
+  "Antes de desistir de tudo, confira se você já almoçou.",
+  "Se a vida fechar uma porta, verifique se não é de puxar.",
+  "Descansar não é procrastinar. É manutenção preventiva.",
+  "Não tente controlar o universo. Você nem controla o horário que o ônibus chega.",
+  "Tudo passa. Até o salário, infelizmente.",
+  "Deus está no controle, apesar das suas constantes tentativas de assumir a gerência.",
+  "Até Jesus dormiu durante uma tempestade. Tire seu cochilo sem culpa.",
+  "Não deixe a ansiedade consumir uma energia que poderia ser utilizada para fazer carinho em gatos.",
+  "Nem todo problema precisa de uma solução imediata. Alguns precisam de um abraço e uma sobremesa.",
+  "Você não precisa ser uma Mulher-Maravilha todos os dias. Até super-heróis têm direito a folga.",
+  "Não tente resolver os próximos dez anos numa quarta-feira.",
+  "A vida já é complicada demais para você ficar inventando problemas que ainda nem existem.",
+  "Nem toda batalha merece sua energia. Algumas merecem apenas um sonoro ‘é sobre isso’ e uma soneca.",
+  "Nem toda incerteza precisa ser resolvida. Algumas precisam apenas ser atravessadas.",
+  "Você não precisa conhecer o destino para dar o próximo passo.",
+  "Não confunda um momento difícil com uma vida difícil.",
+  "Algumas estações da vida não são para florescer, mas para fortalecer as raízes.",
+  "Há uma diferença entre estar perdida e estar descobrindo um novo caminho.",
+  "Nem tudo que foge do seu controle está destinado a dar errado.",
+  "Você não precisa sentir-se em casa imediatamente. O pertencimento também leva tempo.",
+  "A vida não precisa estar completamente organizada para ser bonita.",
+  "O fato de você não compreender o caminho não significa que Deus tenha perdido a direção.",
+  "Deus não exige que você conheça todo o percurso, apenas que confie nele durante a caminhada.",
+  "A fé não elimina todas as perguntas, mas nos permite viver sem precisar de todas as respostas.",
+  "Deus também trabalha nos dias em que você sente que nada está acontecendo.",
+  "Você pode descansar mesmo enquanto algumas das suas orações ainda não foram respondidas.",
+  "Deus não te ama menos nos dias em que você consegue orar menos.",
+  "‘Não vos inquieteis, pois, pelo dia de amanhã.’ — Mateus 6:34",
+  "‘Perto está o Senhor dos que têm o coração quebrantado.’ — Salmos 34:18",
+  "‘A minha presença irá contigo, e eu te darei descanso.’ — Êxodo 33:14",
+  "‘Não temas, porque eu sou contigo; não te assombres, porque eu sou teu Deus.’ — Isaías 41:10",
+  "‘Em qualquer tempo em que eu temer, confiarei em ti.’ — Salmos 56:3",
+  "‘Lançando sobre ele toda a vossa ansiedade, porque ele tem cuidado de vós.’ — 1 Pedro 5:7",
+  "Espero que você encontre tantos motivos para sorrir hoje quanto eu encontrei quando estava com você.",
+  "Se hoje estiver faltando algum motivo para sorrir, posso disponibilizar um pouco do meu sotaque mineiro.",
+  "Espero que, entre tantas responsabilidades, você encontre um tempinho para simplesmente ser Maria.",
+];
 
 function createInitialBoard(size: number) {
   return Array<CellState>(size * size).fill(0);
@@ -75,6 +125,10 @@ export function Game() {
   const [messageKind, setMessageKind] = useState<MessageKind>("info");
   const [mistakeIndex, setMistakeIndex] = useState<number | null>(null);
   const [hintIndex, setHintIndex] = useState<number | null>(null);
+  const [victoryOpen, setVictoryOpen] = useState(false);
+  const [motivation, setMotivation] = useState(MOTIVATIONAL_MESSAGES[0]);
+  const motivationIndexRef = useRef(0);
+  const wasCompletedRef = useRef(false);
 
   useEffect(() => {
     boardRef.current = board;
@@ -99,6 +153,8 @@ export function Game() {
     setMessageKind("info");
     setMistakeIndex(null);
     setHintIndex(null);
+    setVictoryOpen(false);
+    wasCompletedRef.current = false;
   }, [difficulty]);
 
   const chooseDifficulty = (next: Difficulty) => {
@@ -114,6 +170,7 @@ export function Game() {
 
   const applySingleClick = (index: number) => {
     const current = boardRef.current;
+    if (isComplete(current, size, regions)) return;
     if (current[index] === 2) return;
     setMistakeIndex(null);
     setHintIndex(null);
@@ -127,6 +184,7 @@ export function Game() {
 
   const applyDoubleClick = (index: number) => {
     const current = boardRef.current;
+    if (isComplete(current, size, regions)) return;
     if (current[index] === 2) return;
     setHintIndex(null);
 
@@ -153,6 +211,7 @@ export function Game() {
   };
 
   const markDraggedCell = (index: number) => {
+    if (isComplete(boardRef.current, size, regions)) return;
     const drag = dragRef.current;
     if (drag.visited.has(index)) return;
     drag.visited.add(index);
@@ -166,6 +225,7 @@ export function Game() {
   };
 
   const handlePointerDown = (index: number, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (isComplete(boardRef.current, size, regions)) return;
     if (event.button !== 0 || boardRef.current[index] === 2) return;
     event.currentTarget.setPointerCapture(event.pointerId);
     dragRef.current = {
@@ -178,6 +238,7 @@ export function Game() {
   };
 
   const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    if (isComplete(boardRef.current, size, regions)) return;
     const drag = dragRef.current;
     if (!drag.active || drag.pointerId !== event.pointerId || drag.startIndex === null) return;
 
@@ -214,6 +275,7 @@ export function Game() {
   };
 
   const handleCellClick = (index: number) => {
+    if (isComplete(boardRef.current, size, regions)) return;
     if (suppressClickRef.current) {
       suppressClickRef.current = false;
       return;
@@ -233,6 +295,7 @@ export function Game() {
   };
 
   const handleCellDoubleClick = (index: number) => {
+    if (isComplete(boardRef.current, size, regions)) return;
     const pending = clickTimers.current.get(index);
     if (pending) window.clearTimeout(pending);
     clickTimers.current.delete(index);
@@ -281,24 +344,44 @@ export function Game() {
   const blockedCells = useMemo(() => getBlockedCells(board, size, regions), [board, size, regions]);
   const completed = useMemo(() => isComplete(board, size, regions), [board, size, regions]);
 
+  useEffect(() => {
+    if (completed && !wasCompletedRef.current) {
+      let nextIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
+      while (MOTIVATIONAL_MESSAGES.length > 1 && nextIndex === motivationIndexRef.current) {
+        nextIndex = Math.floor(Math.random() * MOTIVATIONAL_MESSAGES.length);
+      }
+      motivationIndexRef.current = nextIndex;
+      setMotivation(MOTIVATIONAL_MESSAGES[nextIndex]);
+      setVictoryOpen(true);
+    }
+    wasCompletedRef.current = completed;
+  }, [completed]);
+
+  const goToNextLevel = () => {
+    const nextLevel = level === 12 ? 1 : level + 1;
+    setVictoryOpen(false);
+    setLevel(nextLevel);
+    reset(difficulty);
+  };
+
   return (
     <main>
       <header className="site-header">
-        <a className="brand" href="#game" aria-label="MeowMaria início">
-          <span className="brand-mark"><MariaPortrait /></span>
-          <span><strong>MeowMaria</strong><small>Logic puzzle</small></span>
+        <a className="brand" href="#game" aria-label="DudaMia início">
+          <span className="brand-mark">🐱</span>
+          <span><strong>DudaMia</strong><small>Logic puzzle</small></span>
         </a>
         <button className="round-button menu" aria-label="Abrir menu"><Icon>☰</Icon></button>
       </header>
 
       <section className="game-shell" id="game">
         <div className="game-heading">
-          <div className="progress-pill"><span className="cat-face"><MariaPortrait variant={(level - 1) * size + placed} /></span><strong>{placed}</strong><span>/{size}</span></div>
+          <div className="progress-pill"><span className="cat-face">🐱</span><strong>{placed}</strong><span>/{size}</span></div>
           <div className="title-block"><p>Fase {level}</p><span>Dificuldade</span></div>
           <div className="game-actions">
             <button className="round-button" onClick={() => setLevelsOpen(true)} aria-label="Selecionar fase"><Icon>▦</Icon></button>
             <button className="round-button" onClick={hint} aria-label="Mostrar dica"><Icon>♧</Icon></button>
-            <button className="round-button" onClick={undo} disabled={!history.length} aria-label="Desfazer"><Icon>↶</Icon></button>
+            <button className="round-button" onClick={undo} disabled={completed || !history.length} aria-label="Desfazer"><Icon>↶</Icon></button>
             <button className="round-button" onClick={() => reset()} aria-label="Reiniciar"><Icon>↻</Icon></button>
             <button className="round-button" onClick={() => setRulesOpen(true)} aria-label="Abrir regras"><Icon>?</Icon></button>
           </div>
@@ -325,6 +408,7 @@ export function Game() {
               <button
                 key={index}
                 data-cell-index={index}
+                disabled={completed}
                 className={`cell ${blockedCells.has(index) && state === 0 ? "blocked" : ""} ${mistakeIndex === index ? "mistake" : ""} ${hintIndex === index ? "hinted" : ""}`}
                 style={{ backgroundColor: REGION_COLORS[regions[index] % REGION_COLORS.length] }}
                 onPointerDown={(event) => handlePointerDown(index, event)}
@@ -340,7 +424,7 @@ export function Game() {
             ))}
           </div>
           <p className={`game-message ${messageKind}`} aria-live="polite">{message}</p>
-          {completed && <button className="next-level-button" onClick={() => { const nextLevel = level === 12 ? 1 : level + 1; setLevel(nextLevel); reset(difficulty); }}>Próxima fase</button>}
+          {completed && <button className="next-level-button" onClick={goToNextLevel}>Próxima fase</button>}
         </div>
       </section>
 
@@ -365,16 +449,28 @@ export function Game() {
         </div>
       </section>
 
-      <footer><div className="brand"><span className="brand-mark"><MariaPortrait variant={3} /></span><span><strong>MeowMaria</strong><small>Feito para mentes curiosas.</small></span></div><p>Projeto independente inspirado em jogos de lógica felinos.</p></footer>
+      <footer><div className="brand"><span className="brand-mark">🐱</span><span><strong>DudaMia</strong><small>Feito para mentes curiosas.</small></span></div><p>Projeto independente inspirado em jogos de lógica felinos.</p></footer>
+
+      {victoryOpen && (
+        <div className="modal-backdrop victory-backdrop" role="presentation">
+          <div className="modal victory-modal" role="dialog" aria-modal="true" aria-labelledby="victory-title">
+            <span className="modal-cat"><MariaPortrait variant={(level - 1) * size + placed} /></span>
+            <span className="eyebrow">FASE CONCLUÍDA</span>
+            <h2 id="victory-title">Você conseguiu! ✨</h2>
+            <p className="motivation-message">{motivation}</p>
+            <button className="primary-button" onClick={goToNextLevel}>Próxima fase</button>
+          </div>
+        </div>
+      )}
 
       {rulesOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setRulesOpen(false)}>
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="rules-title">
             <button className="modal-close" onClick={() => setRulesOpen(false)} aria-label="Fechar regras">×</button>
-            <span className="modal-cat"><MariaPortrait variant={12} /></span>
+            <span className="modal-cat">🐱</span>
             <h2 id="rules-title">Como jogar</h2>
             <p>Um clique marca ou remove um <strong>×</strong>. Clique e arraste para marcar várias casas. Dois cliques rápidos revelam um gato correto ou mostram um <strong>× vermelho</strong> quando a tentativa está errada.</p>
-            <div className="mini-flow"><span>×</span><b>1×</b><span className="mini-portrait"><MariaPortrait variant={2} /></span><b>2×</b><span className="wrong-example">×</span></div>
+            <div className="mini-flow"><span>×</span><b>1×</b><span className="mini-portrait">🐱</span><b>2×</b><span className="wrong-example">×</span></div>
             <ul><li>Um gato em cada região colorida</li><li>Um gato por linha e coluna</li><li>Nenhum gato pode tocar outro</li></ul>
             <button className="primary-button" onClick={() => setRulesOpen(false)}>Vamos jogar</button>
           </div>
