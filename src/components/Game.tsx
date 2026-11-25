@@ -15,11 +15,8 @@ const DIFFICULTIES: Record<Difficulty, { size: number; label: string }> = {
 
 const REGION_COLORS = ["#7eb3d5", "#abd28e", "#c88aba", "#e7cc60", "#77c1bd", "#c790aa", "#e99d78", "#91c4a9"];
 
-function createInitialBoard(size: number, level: number) {
-  const puzzle = getPuzzle(size, level);
-  const next = Array<CellState>(size * size).fill(0);
-  next[puzzle.lockedIndex] = 2;
-  return next;
+function createInitialBoard(size: number) {
+  return Array<CellState>(size * size).fill(0);
 }
 
 function Icon({ children }: { children: React.ReactNode }) {
@@ -33,12 +30,12 @@ export function Game() {
   const [levelsOpen, setLevelsOpen] = useState(false);
   const size = DIFFICULTIES[difficulty].size;
   const puzzle = useMemo(() => getPuzzle(size, level), [size, level]);
-  const { regions, lockedIndex } = puzzle;
-  const [board, setBoard] = useState<CellState[]>(() => createInitialBoard(6, 1));
+  const { regions } = puzzle;
+  const [board, setBoard] = useState<CellState[]>(() => createInitialBoard(6));
   const boardRef = useRef(board);
   const clickTimers = useRef(new Map<number, number>());
   const [history, setHistory] = useState<CellState[][]>([]);
-  const [message, setMessage] = useState("Comece pelo gatinho bloqueado.");
+  const [message, setMessage] = useState("Comece procurando uma casa logicamente obrigatória.");
   const [messageKind, setMessageKind] = useState<MessageKind>("info");
   const [mistakeIndex, setMistakeIndex] = useState<number | null>(null);
   const [hintIndex, setHintIndex] = useState<number | null>(null);
@@ -52,19 +49,19 @@ export function Game() {
     clickTimers.current.clear();
   }, []);
 
-  const reset = useCallback((nextDifficulty = difficulty, nextLevel = level) => {
+  const reset = useCallback((nextDifficulty = difficulty) => {
     const nextSize = DIFFICULTIES[nextDifficulty].size;
-    const initialBoard = createInitialBoard(nextSize, nextLevel);
+    const initialBoard = createInitialBoard(nextSize);
     clickTimers.current.forEach((timer) => window.clearTimeout(timer));
     clickTimers.current.clear();
     boardRef.current = initialBoard;
     setBoard(initialBoard);
     setHistory([]);
-    setMessage("Comece pelo gatinho bloqueado.");
+    setMessage("Comece procurando uma casa logicamente obrigatória.");
     setMessageKind("info");
     setMistakeIndex(null);
     setHintIndex(null);
-  }, [difficulty, level]);
+  }, [difficulty]);
 
   const chooseDifficulty = (next: Difficulty) => {
     setDifficulty(next);
@@ -79,7 +76,7 @@ export function Game() {
 
   const applySingleClick = (index: number) => {
     const current = boardRef.current;
-    if (index === lockedIndex || current[index] === 2) return;
+    if (current[index] === 2) return;
     setMistakeIndex(null);
     setHintIndex(null);
 
@@ -92,7 +89,7 @@ export function Game() {
 
   const applyDoubleClick = (index: number) => {
     const current = boardRef.current;
-    if (index === lockedIndex || current[index] === 2) return;
+    if (current[index] === 2) return;
     setHintIndex(null);
 
     const row = Math.floor(index / size);
@@ -118,7 +115,6 @@ export function Game() {
   };
 
   const handleCellClick = (index: number) => {
-    if (index === lockedIndex) return;
     const pending = clickTimers.current.get(index);
     if (pending) {
       window.clearTimeout(pending);
@@ -212,11 +208,14 @@ export function Game() {
         </div>
 
         <div className="board-card">
-          <div className="board" style={{ gridTemplateColumns: `repeat(${size}, 1fr)` }}>
+          <div className="board" style={{
+            gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
+            gridTemplateRows: `repeat(${size}, minmax(0, 1fr))`,
+          }}>
             {board.map((state, index) => (
               <button
                 key={index}
-                className={`cell ${index === lockedIndex ? "locked" : ""} ${blockedCells.has(index) && state === 0 ? "blocked" : ""} ${mistakeIndex === index ? "mistake" : ""} ${hintIndex === index ? "hinted" : ""}`}
+                className={`cell ${blockedCells.has(index) && state === 0 ? "blocked" : ""} ${mistakeIndex === index ? "mistake" : ""} ${hintIndex === index ? "hinted" : ""}`}
                 style={{ backgroundColor: REGION_COLORS[regions[index] % REGION_COLORS.length] }}
                 onClick={() => handleCellClick(index)}
                 onDoubleClick={() => handleCellDoubleClick(index)}
@@ -230,7 +229,7 @@ export function Game() {
             ))}
           </div>
           <p className={`game-message ${messageKind}`} aria-live="polite">{message}</p>
-          {completed && <button className="next-level-button" onClick={() => { const nextLevel = level === 12 ? 1 : level + 1; setLevel(nextLevel); reset(difficulty, nextLevel); }}>Próxima fase</button>}
+          {completed && <button className="next-level-button" onClick={() => { const nextLevel = level === 12 ? 1 : level + 1; setLevel(nextLevel); reset(difficulty); }}>Próxima fase</button>}
         </div>
       </section>
 
@@ -276,7 +275,7 @@ export function Game() {
           <div className="modal level-modal" role="dialog" aria-modal="true" aria-labelledby="levels-title">
             <button className="modal-close" onClick={() => setLevelsOpen(false)} aria-label="Fechar fases">×</button>
             <h2 id="levels-title">Escolha uma fase</h2>
-            <div className="level-grid">{Array.from({ length: 12 }, (_, index) => <button key={index} className={level === index + 1 ? "selected" : ""} onClick={() => { const nextLevel = index + 1; setLevel(nextLevel); reset(difficulty, nextLevel); setLevelsOpen(false); }}>{index + 1}</button>)}</div>
+            <div className="level-grid">{Array.from({ length: 12 }, (_, index) => <button key={index} className={level === index + 1 ? "selected" : ""} onClick={() => { const nextLevel = index + 1; setLevel(nextLevel); reset(difficulty); setLevelsOpen(false); }}>{index + 1}</button>)}</div>
           </div>
         </div>
       )}
