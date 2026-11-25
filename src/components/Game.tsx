@@ -1,11 +1,19 @@
 "use client";
 
+import Image from "next/image";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { getBlockedCells, isComplete, type CellState } from "@/lib/game-rules";
 import { findLogicalStep, getPuzzle } from "@/lib/puzzle-generator";
 
 type Difficulty = "normal" | "hard" | "ultra";
 type MessageKind = "info" | "error" | "success";
+type DragState = {
+  active: boolean;
+  pointerId: number | null;
+  startIndex: number | null;
+  dragging: boolean;
+  visited: Set<number>;
+};
 
 const DIFFICULTIES: Record<Difficulty, { size: number; label: string }> = {
   normal: { size: 6, label: "Normal" },
@@ -14,6 +22,21 @@ const DIFFICULTIES: Record<Difficulty, { size: number; label: string }> = {
 };
 
 const REGION_COLORS = ["#7eb3d5", "#abd28e", "#c88aba", "#e7cc60", "#77c1bd", "#c790aa", "#e99d78", "#91c4a9"];
+const MARIA_PORTRAITS = [
+  "/maria-face.png",
+  "/maria-face-party.png",
+  "/maria-face-smile.png",
+  "/maria-face-pizza.png",
+  "/maria-face-square.png",
+  "/maria-face-child.png",
+  "/maria-face-baby.png",
+  "/maria-face-laugh-1.png",
+  "/maria-face-laugh-2.png",
+  "/maria-face-pose.png",
+  "/maria-face-adjusting.png",
+  "/maria-face-painting.png",
+  "/maria-face-cap-close.png",
+];
 
 function createInitialBoard(size: number) {
   return Array<CellState>(size * size).fill(0);
@@ -21,6 +44,11 @@ function createInitialBoard(size: number) {
 
 function Icon({ children }: { children: React.ReactNode }) {
   return <span aria-hidden="true" className="icon-glyph">{children}</span>;
+}
+
+function MariaPortrait({ variant = 0 }: { variant?: number }) {
+  const src = MARIA_PORTRAITS[Math.abs(variant) % MARIA_PORTRAITS.length];
+  return <Image className="maria-portrait" src={src} alt="" width={256} height={256} aria-hidden="true" />;
 }
 
 export function Game() {
@@ -34,6 +62,14 @@ export function Game() {
   const [board, setBoard] = useState<CellState[]>(() => createInitialBoard(6));
   const boardRef = useRef(board);
   const clickTimers = useRef(new Map<number, number>());
+  const dragRef = useRef<DragState>({
+    active: false,
+    pointerId: null,
+    startIndex: null,
+    dragging: false,
+    visited: new Set(),
+  });
+  const suppressClickRef = useRef(false);
   const [history, setHistory] = useState<CellState[][]>([]);
   const [message, setMessage] = useState("Comece procurando uma casa logicamente obrigatória.");
   const [messageKind, setMessageKind] = useState<MessageKind>("info");
@@ -54,6 +90,8 @@ export function Game() {
     const initialBoard = createInitialBoard(nextSize);
     clickTimers.current.forEach((timer) => window.clearTimeout(timer));
     clickTimers.current.clear();
+    dragRef.current = { active: false, pointerId: null, startIndex: null, dragging: false, visited: new Set() };
+    suppressClickRef.current = false;
     boardRef.current = initialBoard;
     setBoard(initialBoard);
     setHistory([]);
@@ -114,7 +152,72 @@ export function Game() {
     }
   };
 
+  const markDraggedCell = (index: number) => {
+    const drag = dragRef.current;
+    if (drag.visited.has(index)) return;
+    drag.visited.add(index);
+
+    const current = boardRef.current;
+    if (current[index] === 1 || current[index] === 2) return;
+    const next = [...current];
+    next[index] = 1;
+    boardRef.current = next;
+    setBoard(next);
+  };
+
+  const handlePointerDown = (index: number, event: React.PointerEvent<HTMLButtonElement>) => {
+    if (event.button !== 0 || boardRef.current[index] === 2) return;
+    event.currentTarget.setPointerCapture(event.pointerId);
+    dragRef.current = {
+      active: true,
+      pointerId: event.pointerId,
+      startIndex: index,
+      dragging: false,
+      visited: new Set(),
+    };
+  };
+
+  const handlePointerMove = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag.active || drag.pointerId !== event.pointerId || drag.startIndex === null) return;
+
+    const target = document.elementFromPoint(event.clientX, event.clientY)?.closest<HTMLElement>("[data-cell-index]");
+    const targetIndex = target ? Number(target.dataset.cellIndex) : Number.NaN;
+    if (!Number.isInteger(targetIndex) || targetIndex === drag.startIndex && !drag.dragging) return;
+
+    if (!drag.dragging) {
+      drag.dragging = true;
+      suppressClickRef.current = true;
+      clickTimers.current.forEach((timer) => window.clearTimeout(timer));
+      clickTimers.current.clear();
+      const historySnapshot = boardRef.current;
+      setHistory((items) => [...items, historySnapshot]);
+      markDraggedCell(drag.startIndex);
+    }
+
+    markDraggedCell(targetIndex);
+    setMistakeIndex(null);
+    setHintIndex(null);
+    setMessage("Células marcadas como impossíveis.");
+    setMessageKind("info");
+  };
+
+  const finishPointerGesture = (event: React.PointerEvent<HTMLDivElement>) => {
+    const drag = dragRef.current;
+    if (!drag.active || drag.pointerId !== event.pointerId) return;
+    dragRef.current = { active: false, pointerId: null, startIndex: null, dragging: false, visited: new Set() };
+    if (drag.dragging) {
+      window.setTimeout(() => {
+        suppressClickRef.current = false;
+      }, 0);
+    }
+  };
+
   const handleCellClick = (index: number) => {
+    if (suppressClickRef.current) {
+      suppressClickRef.current = false;
+      return;
+    }
     const pending = clickTimers.current.get(index);
     if (pending) {
       window.clearTimeout(pending);
@@ -182,7 +285,7 @@ export function Game() {
     <main>
       <header className="site-header">
         <a className="brand" href="#game" aria-label="MeowMaria início">
-          <span className="brand-mark">🐱</span>
+          <span className="brand-mark"><MariaPortrait /></span>
           <span><strong>MeowMaria</strong><small>Logic puzzle</small></span>
         </a>
         <button className="round-button menu" aria-label="Abrir menu"><Icon>☰</Icon></button>
@@ -190,7 +293,7 @@ export function Game() {
 
       <section className="game-shell" id="game">
         <div className="game-heading">
-          <div className="progress-pill"><span className="cat-face">🐱</span><strong>{placed}</strong><span>/{size}</span></div>
+          <div className="progress-pill"><span className="cat-face"><MariaPortrait variant={(level - 1) * size + placed} /></span><strong>{placed}</strong><span>/{size}</span></div>
           <div className="title-block"><p>Fase {level}</p><span>Dificuldade</span></div>
           <div className="game-actions">
             <button className="round-button" onClick={() => setLevelsOpen(true)} aria-label="Selecionar fase"><Icon>▦</Icon></button>
@@ -208,22 +311,30 @@ export function Game() {
         </div>
 
         <div className="board-card">
-          <div className="board" style={{
+          <div
+            className="board"
+            onPointerMove={handlePointerMove}
+            onPointerUp={finishPointerGesture}
+            onPointerCancel={finishPointerGesture}
+            style={{
             gridTemplateColumns: `repeat(${size}, minmax(0, 1fr))`,
             gridTemplateRows: `repeat(${size}, minmax(0, 1fr))`,
-          }}>
+            }}
+          >
             {board.map((state, index) => (
               <button
                 key={index}
+                data-cell-index={index}
                 className={`cell ${blockedCells.has(index) && state === 0 ? "blocked" : ""} ${mistakeIndex === index ? "mistake" : ""} ${hintIndex === index ? "hinted" : ""}`}
                 style={{ backgroundColor: REGION_COLORS[regions[index] % REGION_COLORS.length] }}
+                onPointerDown={(event) => handlePointerDown(index, event)}
                 onClick={() => handleCellClick(index)}
                 onDoubleClick={() => handleCellDoubleClick(index)}
                 aria-label={`Linha ${Math.floor(index / size) + 1}, coluna ${(index % size) + 1}, região ${regions[index] + 1}${state === 1 ? ", marcada" : state === 2 ? ", gato" : state === 3 ? ", tentativa incorreta" : blockedCells.has(index) ? ", bloqueada pelas regras" : ""}`}
               >
                 {state === 1 && <span className="x-mark">×</span>}
                 {state === 3 && <span className="x-mark wrong">×</span>}
-                {state === 2 && <span className="placed-cat">🐱</span>}
+                {state === 2 && <span className="placed-cat"><MariaPortrait variant={(level - 1) * size + regions[index]} /></span>}
                 {state === 0 && blockedCells.has(index) && <span className="blocked-dot" aria-hidden="true" />}
               </button>
             ))}
@@ -254,16 +365,16 @@ export function Game() {
         </div>
       </section>
 
-      <footer><div className="brand"><span className="brand-mark">🐱</span><span><strong>MeowMaria</strong><small>Feito para mentes curiosas.</small></span></div><p>Projeto independente inspirado em jogos de lógica felinos.</p></footer>
+      <footer><div className="brand"><span className="brand-mark"><MariaPortrait variant={3} /></span><span><strong>MeowMaria</strong><small>Feito para mentes curiosas.</small></span></div><p>Projeto independente inspirado em jogos de lógica felinos.</p></footer>
 
       {rulesOpen && (
         <div className="modal-backdrop" role="presentation" onMouseDown={(event) => event.target === event.currentTarget && setRulesOpen(false)}>
           <div className="modal" role="dialog" aria-modal="true" aria-labelledby="rules-title">
             <button className="modal-close" onClick={() => setRulesOpen(false)} aria-label="Fechar regras">×</button>
-            <span className="modal-cat">🐱</span>
+            <span className="modal-cat"><MariaPortrait variant={12} /></span>
             <h2 id="rules-title">Como jogar</h2>
-            <p>Um clique marca ou remove um <strong>×</strong>. Dois cliques rápidos revelam um gato correto ou mostram um <strong>× vermelho</strong> quando a tentativa está errada.</p>
-            <div className="mini-flow"><span>×</span><b>1×</b><span>🐱</span><b>2×</b><span className="wrong-example">×</span></div>
+            <p>Um clique marca ou remove um <strong>×</strong>. Clique e arraste para marcar várias casas. Dois cliques rápidos revelam um gato correto ou mostram um <strong>× vermelho</strong> quando a tentativa está errada.</p>
+            <div className="mini-flow"><span>×</span><b>1×</b><span className="mini-portrait"><MariaPortrait variant={2} /></span><b>2×</b><span className="wrong-example">×</span></div>
             <ul><li>Um gato em cada região colorida</li><li>Um gato por linha e coluna</li><li>Nenhum gato pode tocar outro</li></ul>
             <button className="primary-button" onClick={() => setRulesOpen(false)}>Vamos jogar</button>
           </div>
