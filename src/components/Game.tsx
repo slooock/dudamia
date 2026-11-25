@@ -21,7 +21,7 @@ const DIFFICULTIES: Record<Difficulty, { size: number; label: string }> = {
   ultra: { size: 8, label: "Ultra" },
 };
 
-const REGION_COLORS = ["#7eb3d5", "#abd28e", "#c88aba", "#e7cc60", "#77c1bd", "#c790aa", "#e99d78", "#91c4a9"];
+const REGION_COLORS = ["#65a9d8", "#9acb73", "#b66db3", "#ebcb5a", "#3aa6a0", "#d28ba5", "#e58b4d", "#7a9fd1"];
 const MARIA_PORTRAITS = [
   "/maria-face.webp",
   "/maria-face-party.webp",
