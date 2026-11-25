@@ -23,19 +23,19 @@ const DIFFICULTIES: Record<Difficulty, { size: number; label: string }> = {
 
 const REGION_COLORS = ["#7eb3d5", "#abd28e", "#c88aba", "#e7cc60", "#77c1bd", "#c790aa", "#e99d78", "#91c4a9"];
 const MARIA_PORTRAITS = [
-  "/maria-face.png",
-  "/maria-face-party.png",
-  "/maria-face-smile.png",
-  "/maria-face-pizza.png",
-  "/maria-face-square.png",
-  "/maria-face-child.png",
-  "/maria-face-baby.png",
-  "/maria-face-laugh-1.png",
-  "/maria-face-laugh-2.png",
-  "/maria-face-pose.png",
-  "/maria-face-adjusting.png",
-  "/maria-face-painting.png",
-  "/maria-face-cap-close.png",
+  "/maria-face.webp",
+  "/maria-face-party.webp",
+  "/maria-face-smile.webp",
+  "/maria-face-pizza.webp",
+  "/maria-face-square.webp",
+  "/maria-face-child.webp",
+  "/maria-face-baby.webp",
+  "/maria-face-laugh-1.webp",
+  "/maria-face-laugh-2.webp",
+  "/maria-face-pose.webp",
+  "/maria-face-adjusting.webp",
+  "/maria-face-painting.webp",
+  "/maria-face-cap-close.webp",
 ];
 const MOTIVATIONAL_MESSAGES = [
   "Se não conseguir vencer o dia, pelo menos empate. Amanhã tem jogo de volta.",
@@ -98,7 +98,7 @@ function Icon({ children }: { children: React.ReactNode }) {
 
 function MariaPortrait({ variant = 0 }: { variant?: number }) {
   const src = MARIA_PORTRAITS[Math.abs(variant) % MARIA_PORTRAITS.length];
-  return <Image className="maria-portrait" src={src} alt="" width={256} height={256} aria-hidden="true" />;
+  return <Image className="maria-portrait" src={src} alt="" width={640} height={640} loading="eager" unoptimized aria-hidden="true" />;
 }
 
 export function Game() {
@@ -133,6 +133,13 @@ export function Game() {
   useEffect(() => {
     boardRef.current = board;
   }, [board]);
+
+  useEffect(() => {
+    MARIA_PORTRAITS.forEach((src) => {
+      const image = new window.Image();
+      image.src = src;
+    });
+  }, []);
 
   useEffect(() => () => {
     clickTimers.current.forEach((timer) => window.clearTimeout(timer));
